@@ -77,16 +77,18 @@ SOURCE_CLASS_BOUNDARIES: dict[SourceClass, BoundaryDescriptor] = {
 
 
 def validate_boundary_prose(
-    source_class: SourceClass,
-    prose: str,
-    line_no: int,
-    file_path: str,
+    source_class: SourceClass | None = None,
+    prose: str = "",
+    line_no: int = 1,
+    file_path: str = "",
+    declared_class: SourceClass | None = None,
 ) -> list[Finding]:
     """Validate that a Claim Boundary text block matches the declared source class."""
-    if source_class not in SOURCE_CLASS_BOUNDARIES:
+    target_class = declared_class or source_class
+    if target_class is None or target_class not in SOURCE_CLASS_BOUNDARIES:
         return []
 
-    descriptor = SOURCE_CLASS_BOUNDARIES[source_class]
+    descriptor = SOURCE_CLASS_BOUNDARIES[target_class]
     findings: list[Finding] = []
 
     # Check for direct incompatibility
@@ -98,7 +100,7 @@ def validate_boundary_prose(
                 category=FindingCategory.SOURCE_CLASS_BOUNDARY_MISMATCH,
                 severity=Severity.HARD_FAIL,
                 message=(
-                    f"Claim boundary mismatch for source class {source_class.value}: "
+                    f"Claim boundary mismatch for source class {target_class.value}: "
                     f"prose uses {descriptor.incompatible_desc} ({incompat_match.group(0)!r}) "
                     f"instead of {descriptor.expected_desc}"
                 ),
@@ -119,7 +121,7 @@ def validate_boundary_prose(
                 category=FindingCategory.SOURCE_CLASS_BOUNDARY_MISMATCH,
                 severity=Severity.REVIEW_REQUIRED,
                 message=(
-                    f"Claim boundary for {source_class.value} does not clearly state {descriptor.expected_desc}"
+                    f"Claim boundary for {target_class.value} does not clearly state {descriptor.expected_desc}"
                 ),
                 file_path=file_path,
                 line_number=line_no,

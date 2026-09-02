@@ -1,0 +1,9 @@
+{
+  "fixture_id": "w_bad_04_bib_status_tags",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-BIB-INTERNAL-TAG-LEAK",
+  "severity": "HARD_FAIL",
+  "profile": "WEEKLY_MAGAZINE",
+  "source_failure_family": "BIB_STATUS_TAG_LEAK",
+  "rationale": "Internal Core v2 status tags ([V/M]) and classification notes leaked into bibliography."
+}

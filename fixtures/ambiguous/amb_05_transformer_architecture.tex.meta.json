@@ -1,0 +1,9 @@
+{
+  "fixture_id": "amb_05_transformer_architecture",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "GENERIC",
+  "source_failure_family": "LEGITIMATE_TECHNICAL_LANGUAGE",
+  "rationale": "Transformer architecture is a standard ML term and must pass."
+}

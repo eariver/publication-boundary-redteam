@@ -1,0 +1,9 @@
+{
+  "fixture_id": "w_bad_05_research_vendor_boundary",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-BOUNDARY-SOURCE-CLASS-MISMATCH",
+  "severity": "HARD_FAIL",
+  "profile": "WEEKLY_MAGAZINE",
+  "source_failure_family": "SOURCE_CLASS_MISMATCH",
+  "rationale": "Academic research paper section stamped with vendor claim boundary."
+}

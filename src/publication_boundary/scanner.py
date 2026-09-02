@@ -136,8 +136,6 @@ class PublicationScanner:
         reviews_required = [f for f in findings if f.severity == Severity.REVIEW_REQUIRED]
         passed = (len(hard_fails) == 0) and (not strict or len(reviews_required) == 0)
 
-        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-
         return ValidationResult(
             target_file=file_path,
             profile=profile,
@@ -145,7 +143,6 @@ class PublicationScanner:
             findings=findings,
             metrics={
                 "lines_scanned": len(lines),
-                "scan_time_ms": round(elapsed_ms, 2),
                 "strict_mode": strict,
                 "rules_evaluated": len(self.rules),
             },

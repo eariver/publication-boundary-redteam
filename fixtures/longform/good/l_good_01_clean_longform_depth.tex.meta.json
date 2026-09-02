@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_good_01_clean_longform_depth",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "CLEAN_LONGFORM",
+  "rationale": "Deep technical synthesis written cleanly for readers without pipeline terminology."
+}

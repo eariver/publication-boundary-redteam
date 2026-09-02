@@ -1,0 +1,9 @@
+{
+  "fixture_id": "amb_01_software_architecture",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "GENERIC",
+  "source_failure_family": "LEGITIMATE_TECHNICAL_LANGUAGE",
+  "rationale": "Legitimate use of software architecture must not trigger internal Architecture rule."
+}

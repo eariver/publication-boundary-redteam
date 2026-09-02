@@ -1,0 +1,9 @@
+{
+  "fixture_id": "w_bad_03_grok_path_leak",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-PATH-RAW-PROVENANCE",
+  "severity": "HARD_FAIL",
+  "profile": "WEEKLY_MAGAZINE",
+  "source_failure_family": "RAW_PROVENANCE_URL",
+  "rationale": "Raw repository intake file path leaked into bibliography URL field."
+}

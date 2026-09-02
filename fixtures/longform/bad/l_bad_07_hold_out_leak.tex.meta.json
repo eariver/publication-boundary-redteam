@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_bad_07_hold_out_leak",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-TERM-HOLD-OUT",
+  "severity": "HARD_FAIL",
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "INTERNAL_STATE_LEAK",
+  "rationale": "Pipeline screening status HOLD_OUT leaked into methodology narrative."
+}

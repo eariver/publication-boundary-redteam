@@ -1,0 +1,9 @@
+{
+  "fixture_id": "w_good_06_substantive_coverage",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "WEEKLY_MAGAZINE",
+  "source_failure_family": "SUBSTANTIVE_COVERAGE",
+  "rationale": "Provides concrete technical observations without citing Architecture directives."
+}

@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_good_08_balanced_layout_narrative",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "CLEAN_TIMELINE",
+  "rationale": "Structured historical analysis free of internal workflow markers."
+}

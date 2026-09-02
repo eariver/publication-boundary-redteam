@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_bad_01_internal_evidence_ids",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-TERM-INTERNAL-ID",
+  "severity": "HARD_FAIL",
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "INTERNAL_IDENTIFIER_LEAK",
+  "rationale": "Internal repository evidence identifiers (D017, D021) leaked into technical narrative."
+}

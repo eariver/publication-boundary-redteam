@@ -1,0 +1,9 @@
+{
+  "fixture_id": "amb_02_empirical_evidence",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "GENERIC",
+  "source_failure_family": "LEGITIMATE_TECHNICAL_LANGUAGE",
+  "rationale": "Legitimate use of empirical evidence must not trigger internal Evidence rules."
+}

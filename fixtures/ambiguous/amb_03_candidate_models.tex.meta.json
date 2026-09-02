@@ -1,0 +1,9 @@
+{
+  "fixture_id": "amb_03_candidate_models",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "GENERIC",
+  "source_failure_family": "LEGITIMATE_TECHNICAL_LANGUAGE",
+  "rationale": "Legitimate use of candidate models must not trigger Candidate Selection rule."
+}

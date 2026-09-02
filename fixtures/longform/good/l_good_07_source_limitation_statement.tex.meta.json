@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_good_07_source_limitation_statement",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "CLEAN_LIMITATION",
+  "rationale": "Expresses genuine epistemic limitations without exposing pipeline review machinery."
+}

@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_good_05_clean_technical_notes",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "CLEAN_TECHNICAL_NOTE",
+  "rationale": "Concrete technical depth without referencing Evidence tasks or intake packages."
+}

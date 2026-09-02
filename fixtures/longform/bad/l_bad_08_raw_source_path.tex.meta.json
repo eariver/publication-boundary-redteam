@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_bad_08_raw_source_path",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-PATH-RAW-PROVENANCE",
+  "severity": "HARD_FAIL",
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "RAW_FILESYSTEM_PATH",
+  "rationale": "Raw repository file tree path leaked into published document."
+}

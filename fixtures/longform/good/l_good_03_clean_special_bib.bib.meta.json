@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_good_03_clean_special_bib",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "CLEAN_BIBLIOGRAPHY",
+  "rationale": "Clean bibliography record with descriptive reader note and valid repository URL."
+}

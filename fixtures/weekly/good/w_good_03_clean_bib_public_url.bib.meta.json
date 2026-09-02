@@ -1,0 +1,9 @@
+{
+  "fixture_id": "w_good_03_clean_bib_public_url",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "WEEKLY_MAGAZINE",
+  "source_failure_family": "CLEAN_BIBLIOGRAPHY",
+  "rationale": "Valid public URL and reader-facing context note without internal repository paths."
+}

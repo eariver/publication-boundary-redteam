@@ -1,0 +1,9 @@
+{
+  "fixture_id": "amb_08_medical_screening_test",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "GENERIC",
+  "source_failure_family": "LEGITIMATE_TECHNICAL_LANGUAGE",
+  "rationale": "Medical screening test is legitimate domain terminology, not pipeline screening."
+}

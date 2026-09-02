@@ -63,25 +63,25 @@ class Rule:
 INTERNAL_EXACT_PATTERNS: tuple[tuple[str, Pattern[str], str, Severity], ...] = (
     (
         "RULE-TERM-CORE-V2",
-        re.compile(r"\bCore\s+v2(?:\s+contract)?\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])Core\s+v2(?:\s+contract)?(?![a-zA-Z0-9_])", re.IGNORECASE),
         "Core v2 pipeline contract terminology must not appear in reader publication",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-EVIDENCE-CARD",
-        re.compile(r"\bEvidence\s+Cards?\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])Evidence\s+Cards?(?![a-zA-Z0-9_])", re.IGNORECASE),
         "Internal Evidence Card data structure leaked into reader prose",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-SOCIAL-OBSERVATION",
-        re.compile(r"\bSOCIAL_OBSERVATION\b"),
+        re.compile(r"(?<![a-zA-Z0-9_])SOCIAL_OBSERVATION(?![a-zA-Z0-9_])"),
         "Raw internal source class enum SOCIAL_OBSERVATION leaked into publication",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-HOLD-OUT",
-        re.compile(r"\bHOLD_OUT\b"),
+        re.compile(r"(?<![a-zA-Z0-9_])HOLD_OUT(?![a-zA-Z0-9_])"),
         "Pipeline screening disposition HOLD_OUT leaked into reader prose",
         Severity.HARD_FAIL,
     ),
@@ -93,44 +93,44 @@ INTERNAL_EXACT_PATTERNS: tuple[tuple[str, Pattern[str], str, Severity], ...] = (
     ),
     (
         "RULE-TERM-MATERIALITY-FIELD",
-        re.compile(r"\bmateriality\s*:\s*(?:MATERIAL|CONTEXT|UNKNOWN)\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])materiality\s*:\s*(?:MATERIAL|CONTEXT|UNKNOWN)(?![a-zA-Z0-9_])", re.IGNORECASE),
         "Internal materiality ledger field leaked into publication",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-CORE-EVIDENCE-NOTE",
-        re.compile(r"\bCore\s+v2\s+Evidence\s*:\s*(?:VERIFIED|PARTIAL|UNKNOWN)\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])Core\s+v2\s+Evidence\s*:\s*(?:VERIFIED|PARTIAL|UNKNOWN)(?![a-zA-Z0-9_])", re.IGNORECASE),
         "Internal Core v2 Evidence classification note leaked into publication",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-CANDIDATE-SELECTION",
-        re.compile(r"\bCandidate\s+(?:Selection|Inventory)\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])Candidate\s+(?:Selection|Inventory)(?![a-zA-Z0-9_])", re.IGNORECASE),
         "Internal candidate selection/inventory workflow term leaked",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-REACTION-PASS",
-        re.compile(r"\b(?:Grok\s+)?Reaction\s+Pass\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])(?:Grok\s+)?Reaction\s+Pass(?![a-zA-Z0-9_])", re.IGNORECASE),
         "Internal Grok Reaction Pass workflow term leaked",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-DRAFT-PACKAGE",
-        re.compile(r"\bDraft\s+Packages?\b|\b本\s*package\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])Draft\s+Packages?(?![a-zA-Z0-9_])|本\s*package", re.IGNORECASE),
         "Internal Draft Package container concept leaked into reader prose",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-DISCOVERY-SOURCES",
-        re.compile(r"\bDiscovery\s+sources?\b|\baccepted\s+Discovery\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])Discovery\s+sources?(?![a-zA-Z0-9_])|accepted\s+Discovery", re.IGNORECASE),
         "Internal Discovery intake terminology leaked into reader prose",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-ACCEPTED-EVIDENCE",
         re.compile(
-            r"\baccepted\s+Evidence(?:\s+source)?\b|受理された\s*Evidence|Evidence上の未解決境界|accepted\s+capture",
+            r"(?<![a-zA-Z0-9_])accepted\s+Evidence(?:\s+source)?(?![a-zA-Z0-9_])|受理された\s*Evidence|Evidence上の未解決境界|accepted\s+capture",
             re.IGNORECASE,
         ),
         "Internal evidence runner acceptance status leaked into reader prose",
@@ -138,7 +138,7 @@ INTERNAL_EXACT_PATTERNS: tuple[tuple[str, Pattern[str], str, Severity], ...] = (
     ),
     (
         "RULE-TERM-PROMOTION-COVERAGE-METAS",
-        re.compile(r"一次資料として昇格させない|coverage\s*を広げる|未解決境界を次号へ持ち越す"),
+        re.compile(r"一次資料として昇格させ(?:ない|ず|ぬ)|coverage\s*を広げる|未解決境界を次号へ持ち越す"),
         "Internal pipeline evidence promotion/coverage operations leaked into prose",
         Severity.HARD_FAIL,
     ),
@@ -150,13 +150,13 @@ INTERNAL_EXACT_PATTERNS: tuple[tuple[str, Pattern[str], str, Severity], ...] = (
     ),
     (
         "RULE-TERM-VERIFY-OBLIGATION",
-        re.compile(r"\bVerify\s+[a-zA-Z0-9_-]+\b|The\s+publisher\s+must\s+(?:re)?verify\b", re.IGNORECASE),
+        re.compile(r"(?<![a-zA-Z0-9_])Verify\s+[a-zA-Z0-9_-]+|The\s+publisher\s+must\s+(?:re)?verify", re.IGNORECASE),
         "Internal verification obligation note leaked into reader prose",
         Severity.HARD_FAIL,
     ),
     (
         "RULE-TERM-INTERNAL-ID",
-        re.compile(r"\b(?:D017|D021|EVD-\d{3,})\b"),
+        re.compile(r"(?<![a-zA-Z0-9_])(?:D017|D021|EVD-\d{3,})(?![a-zA-Z0-9_])"),
         "Raw internal Evidence / Discovery identifier leaked into reader prose",
         Severity.HARD_FAIL,
     ),
@@ -243,8 +243,11 @@ REBUTTAL_HARD_FAIL = re.compile(
 )
 
 REBUTTAL_REVIEW_REQUIRED = re.compile(
-    r"(?:前回の(?:案|指摘|指摘理由|指摘事項|レビュー|Architecture)|Human\s+Review(?:er)?(?:の指摘|で修正された|への反論|への応答)|"
-    r"after\s+review\s*,\s*we|in\s+response\s+to\s+review(?:er)?|review-resolution)\b|"
+    r"前回の(?:案|指摘|指摘理由|指摘事項|レビュー|Architecture)|"
+    r"Human\s+Review(?:er)?(?:で(?:の)?(?:指摘|修正された)|の指摘|への反論|への応答)|"
+    r"(?<![a-zA-Z0-9_])after\s+review\s*,\s*we(?![a-zA-Z0-9_])|"
+    r"(?<![a-zA-Z0-9_])in\s+response\s+to\s+review(?:er)?(?![a-zA-Z0-9_])|"
+    r"(?<![a-zA-Z0-9_])review-resolution(?![a-zA-Z0-9_])|"
     r"(?:の|が|は)(?:三つのFeature|3つのFeature|単一の話題)だけではない",
     re.IGNORECASE,
 )

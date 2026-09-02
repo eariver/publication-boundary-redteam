@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_good_02_qualified_claim_prose",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "CLEAN_BOUNDARY",
+  "rationale": "Appropriate limitation framing without internal verification state tags."
+}

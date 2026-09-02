@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_bad_02_verify_obligation",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-TERM-VERIFY-OBLIGATION",
+  "severity": "HARD_FAIL",
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "VERIFY_OBLIGATION_LEAK",
+  "rationale": "Internal verification obligation directive leaked into published text."
+}

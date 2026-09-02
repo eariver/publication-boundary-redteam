@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_bad_04_accepted_evidence_prose",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-TERM-ACCEPTED-EVIDENCE",
+  "severity": "HARD_FAIL",
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "PIPELINE_STATUS_LEAK",
+  "rationale": "Internal pipeline acceptance phrase (SP001 accepted Evidence source) leaked into reader prose."
+}

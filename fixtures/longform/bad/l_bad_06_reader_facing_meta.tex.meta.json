@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_bad_06_reader_facing_meta",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-TERM-READER-FACING-META",
+  "severity": "HARD_FAIL",
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "EDITORIAL_META_LEAK",
+  "rationale": "Editorial meta-vocabulary (reader-facing technical surface) leaked into section text."
+}

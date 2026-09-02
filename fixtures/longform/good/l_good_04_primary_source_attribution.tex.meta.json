@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_good_04_primary_source_attribution",
+  "expected_verdict": "PASS",
+  "expected_rule": null,
+  "severity": null,
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "CLEAN_ATTRIBUTION",
+  "rationale": "Distinguishes specification and licensing sources naturally without mentioning internal IDs."
+}

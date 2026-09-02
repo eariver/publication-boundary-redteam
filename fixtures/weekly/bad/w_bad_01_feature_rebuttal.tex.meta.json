@@ -1,0 +1,9 @@
+{
+  "fixture_id": "w_bad_01_feature_rebuttal",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-REVIEW-REBUTTAL-HARD-FAIL",
+  "severity": "HARD_FAIL",
+  "profile": "WEEKLY_MAGAZINE",
+  "source_failure_family": "REVIEW_REBUTTAL_PROSE",
+  "rationale": "Prose carries editorial review rebuttal phrasing (三つのFeatureだけではない) into reader brief."
+}

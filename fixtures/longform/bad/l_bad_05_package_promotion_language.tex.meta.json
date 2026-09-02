@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_bad_05_package_promotion_language",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-TERM-PROMOTION-COVERAGE-METAS",
+  "severity": "HARD_FAIL",
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "EDITORIAL_OPERATION_LEAK",
+  "rationale": "Internal package curation and promotion operations described in published prose."
+}

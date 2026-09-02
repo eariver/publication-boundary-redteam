@@ -1,0 +1,9 @@
+{
+  "fixture_id": "l_bad_03_core_v2_evidence_bib",
+  "expected_verdict": "FAIL",
+  "expected_rule": "RULE-BIB-INTERNAL-TAG-LEAK",
+  "severity": "HARD_FAIL",
+  "profile": "LONGFORM_SPECIAL",
+  "source_failure_family": "BIB_MATERIALITY_LEAK",
+  "rationale": "Internal Core v2 Evidence state and materiality class exposed in bibliography note."
+}
