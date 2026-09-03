@@ -52,3 +52,25 @@ def test_cli_nonexistent_path(capsys):
     assert code == 2
     captured = capsys.readouterr()
     assert "Error: Target path does not exist" in captured.err
+
+
+def test_cli_needs_review_fails_closed(tmp_path: Path, capsys):
+    sample = tmp_path / "pending.tex"
+    sample.write_text(
+        r"前回のレビュー指摘事項を踏まえて決定した。",
+        encoding="utf-8",
+    )
+    code = main([str(sample), "--format", "json"])
+    assert code == 1  # Fail-closed
+    captured = capsys.readouterr()
+    data = json.loads(captured.out)
+    assert data["passed"] is False
+    assert data["status"] == "NEEDS_REVIEW"
+    assert data["targets_needs_review"] == 1
+
+
+def test_cli_strict_flag_removed():
+    """Verify that obsolete --strict flag is removed from CLI."""
+    with pytest.raises(SystemExit):
+        main(["dummy.tex", "--strict"])
+

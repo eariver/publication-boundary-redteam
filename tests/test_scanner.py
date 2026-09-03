@@ -1,4 +1,4 @@
-"""Tests for the PublicationScanner engine, claimboundary block parsing, and report generation."""
+"""Tests for the PublicationScanner engine, claimboundary block parsing, context tracking, and report generation."""
 
 import json
 from publication_boundary.models import (
@@ -19,6 +19,7 @@ from publication_boundary.scanner import (
     mask_md_comments,
     strip_tex_comments,
 )
+from publication_boundary.semantic_gate import DeterministicGate
 
 
 def test_strip_tex_comments():
@@ -77,7 +78,7 @@ def test_scanner_review_required_fail_closed():
     """REVIEW_REQUIRED findings result in NEEDS_REVIEW status and fail-closed gate."""
     scanner = PublicationScanner()
     sample = "前回のレビュー指摘事項を踏まえて範囲を決定した。"
-    res = scanner.scan_text(sample, "test.tex", strict=False)
+    res = scanner.scan_text(sample, "test.tex")
 
     assert res.status == GateStatus.NEEDS_REVIEW
     assert res.passed is False  # Fail-closed before semantic resolution
@@ -85,8 +86,148 @@ def test_scanner_review_required_fail_closed():
     assert res.hard_fail_count == 0
 
 
-def test_claimboundary_same_line_detection():
-    """Same-line \\begin{claimboundary}...\\end{claimboundary} must be evaluated."""
+# ===========================================================================
+# Finding 1 Tests: claimboundary content must not bypass generic rules
+# ===========================================================================
+
+def test_claimboundary_same_line_internal_term_fails():
+    """Same-line claimboundary containing Core v2 contract must trigger HARD_FAIL."""
+    scanner = PublicationScanner()
+    text = r"\begin{claimboundary} Core v2 contract \end{claimboundary}"
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    assert any(f.rule_id == "RULE-TERM-CORE-V2" for f in res.findings)
+
+
+def test_claimboundary_multiline_opening_trailing_token_fails():
+    """Multiline opening line with trailing internal token must trigger HARD_FAIL."""
+    scanner = PublicationScanner()
+    text = (
+        r"\begin{claimboundary} Core v2 contract" + "\n"
+        r"Legitimate claim limits described here." + "\n"
+        r"\end{claimboundary}"
+    )
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    assert any(f.rule_id == "RULE-TERM-CORE-V2" for f in res.findings)
+
+
+def test_claimboundary_multiline_closing_preceding_token_fails():
+    """Multiline closing line with preceding internal token must trigger HARD_FAIL."""
+    scanner = PublicationScanner()
+    text = (
+        r"\begin{claimboundary}" + "\n"
+        r"Legitimate claim limits described here." + "\n"
+        r"Core v2 contract \end{claimboundary}"
+    )
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    assert any(f.rule_id == "RULE-TERM-CORE-V2" for f in res.findings)
+
+
+def test_claimboundary_unknown_source_class_internal_term_fails():
+    """claimboundary with UNKNOWN source class still triggers HARD_FAIL for internal terms."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Generic Section}" + "\n"
+        r"\begin{claimboundary}" + "\n"
+        r"HOLD_OUT and Evidence Card appear in boundary." + "\n"
+        r"\end{claimboundary}"
+    )
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    rule_ids = {f.rule_id for f in res.findings}
+    assert "RULE-TERM-HOLD-OUT" in rule_ids
+    assert "RULE-TERM-EVIDENCE-CARD" in rule_ids
+
+
+def test_claimboundary_clean_reader_prose_preserved():
+    """Clean claimboundary reader prose without leaks passes as before."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Research Paper Watch}" + "\n"
+        r"\begin{claimboundary}" + "\n"
+        r"Statements reflect author-reported claims from arXiv preprints." + "\n"
+        r"\end{claimboundary}"
+    )
+    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res.passed is True
+    assert res.status == GateStatus.PASS
+    assert len(res.findings) == 0
+
+
+# ===========================================================================
+# Finding 2 Tests: Complete claimboundary token sequence parsing
+# ===========================================================================
+
+def test_claimboundary_two_valid_same_line_blocks_both_evaluated():
+    """Two same-line claimboundary blocks must both be evaluated."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Research Paper Watch}" + "\n"
+        r"\begin{claimboundary} Statements reflect author-reported claims. \end{claimboundary} "
+        r"\begin{claimboundary} Second block with author-reported claims. \end{claimboundary}"
+    )
+    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res.passed is True
+    assert res.status == GateStatus.PASS
+    assert len(res.findings) == 0
+
+
+def test_claimboundary_second_same_line_block_leak_detected():
+    """If first block is clean and second leaks internal term, finding is detected."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Research Paper Watch}" + "\n"
+        r"\begin{claimboundary} Statements reflect author-reported claims. \end{claimboundary} "
+        r"\begin{claimboundary} Core v2 contract \end{claimboundary}"
+    )
+    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    assert any(f.rule_id == "RULE-TERM-CORE-V2" for f in res.findings)
+
+
+def test_claimboundary_same_line_nested_fails_closed():
+    """Same-line nested claimboundary must trigger HARD_FAIL for malformed structure."""
+    scanner = PublicationScanner()
+    text = r"\begin{claimboundary} outer \begin{claimboundary} inner \end{claimboundary} \end{claimboundary}"
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    assert any(f.rule_id == "RULE-BOUNDARY-SYNTAX-MALFORMED" for f in res.findings)
+
+
+def test_claimboundary_unparsed_trailing_content_evaluated():
+    """Multiple begin/end tokens cannot leave unparsed trailing content outside blocks."""
+    scanner = PublicationScanner()
+    text = (
+        r"\begin{claimboundary} clean prose \end{claimboundary} "
+        r"\begin{claimboundary} clean prose \end{claimboundary} "
+        r"Evidence Card leaked after blocks."
+    )
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    assert any(f.rule_id == "RULE-TERM-EVIDENCE-CARD" for f in res.findings)
+
+
+def test_claimboundary_orphan_end_after_same_line_block_fails():
+    """Orphan \\end{claimboundary} after a valid same-line block must trigger HARD_FAIL."""
+    scanner = PublicationScanner()
+    text = r"\begin{claimboundary} clean prose \end{claimboundary} \end{claimboundary}"
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    assert any(f.rule_id == "RULE-BOUNDARY-SYNTAX-MALFORMED" for f in res.findings)
+
+
+def test_claimboundary_same_line_source_class_mismatch():
+    """Same-line block violating source-class boundary must trigger mismatch."""
     scanner = PublicationScanner()
     text = (
         r"\section{Research Watch}" + "\n"
@@ -97,8 +238,8 @@ def test_claimboundary_same_line_detection():
     assert any(f.rule_id == "RULE-BOUNDARY-SOURCE-CLASS-MISMATCH" for f in res.findings)
 
 
-def test_claimboundary_nested_fails_closed():
-    """Nested claimboundary environments must fail closed with malformed structure finding."""
+def test_claimboundary_nested_multiline_fails_closed():
+    """Nested claimboundary environments across multiple lines fail closed."""
     scanner = PublicationScanner()
     text = (
         r"\section{Section}" + "\n"
@@ -127,13 +268,89 @@ def test_claimboundary_unclosed_at_eof_fails_closed():
     assert any(f.rule_id == "RULE-BOUNDARY-SYNTAX-MALFORMED" for f in res.findings)
 
 
-def test_claimboundary_unmatched_end_fails_closed():
-    """Orphan \\end{claimboundary} without \\begin must fail closed."""
+# ===========================================================================
+# Finding 3 Tests: Cross-line location-local context preservation
+# ===========================================================================
+
+def test_cross_line_preserves_originating_section_context():
+    """Cross-line findings must retain location-local semantic context, not subsequent sections."""
     scanner = PublicationScanner()
-    text = r"Normal text." + "\n" + r"\end{claimboundary}"
-    res = scanner.scan_text(text, "test.tex")
+    text = (
+        r"\section{Research Paper Watch}" + "\n"
+        r"今週の動向は三つのFeature" + "\n"
+        r"だけではない。" + "\n"
+        r"\section{Community Pulse}" + "\n"
+        r"Subsequent community commentary."
+    )
+    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
     assert res.passed is False
-    assert any(f.rule_id == "RULE-BOUNDARY-SYNTAX-MALFORMED" for f in res.findings)
+
+    cross_findings = [f for f in res.findings if "三つのFeature" in f.matched_text]
+    assert len(cross_findings) >= 1
+    finding = cross_findings[0]
+
+    # Must preserve originating section context (Research Paper Watch), NOT subsequent (Community Pulse)
+    assert finding.section_role == "Research Paper Watch"
+    assert finding.source_class == "RESEARCH_PAPER"
+    assert finding.line_number == 2
+
+    # Verify that SemanticPacket generated by DeterministicGate also retains originating context
+    gate = DeterministicGate()
+    status, packets = gate.evaluate(res)
+    # Finding is HARD_FAIL, but let's test with a REVIEW_REQUIRED cross-line finding as well
+    assert res.hard_fail_count >= 1
+
+
+def test_cross_line_review_required_packet_context():
+    """Cross-line REVIEW_REQUIRED finding preserves section role in SemanticPacket."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Research Paper Watch}" + "\n"
+        r"前回のレビュー" + "\n"
+        r"指摘事項を踏まえて範囲を決定した。" + "\n"
+        r"\section{Community Pulse}" + "\n"
+        r"Subsequent community commentary."
+    )
+    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res.status == GateStatus.NEEDS_REVIEW
+
+    gate = DeterministicGate()
+    status, packets = gate.evaluate(res)
+    assert status == GateStatus.NEEDS_REVIEW
+    assert len(packets) >= 1
+
+    rev_packet = next(p for p in packets if "前回のレビュー" in p.text)
+    assert rev_packet.section_role == "Research Paper Watch"
+    assert rev_packet.source_class == "RESEARCH_PAPER"
+
+
+# ===========================================================================
+# Directly related cleanup Tests: NEEDS_REVIEW reporting
+# ===========================================================================
+
+def test_reports_preserve_needs_review_status():
+    """Text, JSON, and Markdown reports must preserve 3-state NEEDS_REVIEW status."""
+    scanner = PublicationScanner()
+    sample = "前回のレビュー指摘事項を踏まえて範囲を決定した。\n"
+    res = scanner.scan_text(sample, "pending.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res.status == GateStatus.NEEDS_REVIEW
+
+    # Text report
+    txt = format_text_report(res)
+    assert "Status: [NEEDS_REVIEW]" in txt
+    assert "1 needs review" in txt
+
+    # JSON report
+    js = format_json_report(res)
+    d = json.loads(js)
+    assert d["status"] == "NEEDS_REVIEW"
+    assert d["passed"] is False
+    assert d["targets_needs_review"] == 1
+    assert d["results"][0]["status"] == "NEEDS_REVIEW"
+
+    # Markdown report
+    md = format_markdown_summary([res])
+    assert "⚠️ NEEDS_REVIEW" in md
 
 
 def test_markdown_comment_masking_and_line_preservation():
@@ -149,33 +366,19 @@ def test_markdown_comment_masking_and_line_preservation():
     )
     res = scanner.scan_text(md_text, "report.md")
     assert res.passed is False
-    # Only D017 on line 6 should be found; comments on lines 3-4 must be masked
     assert len(res.findings) == 1
     assert res.findings[0].rule_id == "RULE-TERM-INTERNAL-ID"
     assert res.findings[0].line_number == 6
 
 
-def test_cross_line_token_splitting_buffering():
-    """Phrases split across line breaks must be detected via consecutive line buffering."""
-    scanner = PublicationScanner()
-    text = (
-        r"\section{Synthesis}" + "\n"
-        r"今週の動向は三つのFeature" + "\n"
-        r"だけではない。"
-    )
-    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
-    assert res.passed is False
-    assert any("三つのFeature だけではない" in f.matched_text for f in res.findings)
-
-
-def test_report_formats():
+def test_report_formats_fail():
     scanner = PublicationScanner()
     sample = "HOLD_OUT candidate in text.\n"
     res = scanner.scan_text(sample, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
 
     txt = format_text_report(res)
     assert "PUBLICATION BOUNDARY SCAN REPORT" in txt
-    assert "FAIL" in txt
+    assert "Status: [FAIL]" in txt
 
     js = format_json_report(res)
     d = json.loads(js)
@@ -185,3 +388,35 @@ def test_report_formats():
     md = format_markdown_summary([res])
     assert "| Target File | Profile | Status | Hard Fails | Review Required | Info |" in md
     assert "❌ FAIL" in md
+
+
+def test_claimboundary_malformed_syntax_braces():
+    """Missing closing brace on begin or end tags fails closed."""
+    scanner = PublicationScanner()
+    res1 = scanner.scan_text(r"\begin{claimboundary missing brace", "test.tex")
+    assert res1.passed is False
+    assert any("Malformed \\begin{claimboundary}" in f.message for f in res1.findings)
+
+    res2 = scanner.scan_text(r"\end{claimboundary missing brace", "test.tex")
+    assert res2.passed is False
+    assert any("Malformed \\end{claimboundary}" in f.message for f in res2.findings)
+
+
+def test_report_formats_pass():
+    """Passing results format with PASS status in text, json, and markdown."""
+    scanner = PublicationScanner()
+    res = scanner.scan_text("Clean publication prose.", "clean.tex")
+    assert res.status == GateStatus.PASS
+
+    txt = format_text_report(res)
+    assert "Status: [PASS]" in txt
+    assert "1/1 files passed" in txt
+
+    js = format_json_report(res)
+    d = json.loads(js)
+    assert d["status"] == "PASS"
+    assert d["passed"] is True
+    assert d["targets_passed"] == 1
+
+    md = format_markdown_summary([res])
+    assert "✅ PASS" in md

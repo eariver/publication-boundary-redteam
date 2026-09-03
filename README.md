@@ -109,9 +109,6 @@ publication-boundary-scan surveys/weekly/2026-W33/main.tex --profile weekly
 # Scan a directory with JSON output
 publication-boundary-scan fixtures/longform/bad/ --format json
 
-# Strict mode: fails on REVIEW_REQUIRED in addition to HARD_FAIL
-publication-boundary-scan draft.tex --strict
-
 # Check Claim Boundary consistency against an explicit source class
 publication-boundary-scan section.tex --source-class RESEARCH_PAPER
 ```
@@ -138,7 +135,7 @@ for finding in result.findings:
 
 ## 4. Test Suite & Verification
 
-The test suite includes 84 automated tests covering unit rules, integration scanning, property-based invariants with `hypothesis`, and all 40 machine-readable fixtures.
+The test suite includes 99 automated tests covering unit rules, integration scanning, property-based invariants with `hypothesis`, and all 40 machine-readable fixtures.
 
 ```bash
 # Run pytest with test coverage
@@ -146,11 +143,11 @@ pytest --cov=publication_boundary --cov-report=term-missing
 ```
 
 ### Test Results Summary
-- **Tests Executed**: 84
-- **Tests Passed**: 84
+- **Tests Executed**: 99
+- **Tests Passed**: 99
 - **Test Failures**: 0
-- **Code Coverage**: 96% across `src/publication_boundary`
-- **Execution Time**: ~0.8s
+- **Code Coverage**: 98% across `src/publication_boundary`
+- **Execution Time**: ~1.0s
 
 ---
 

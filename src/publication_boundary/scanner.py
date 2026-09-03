@@ -23,6 +23,13 @@ from publication_boundary.source_class import (
     validate_boundary_prose,
 )
 
+CLAIMBOUNDARY_TOKEN_RE = re.compile(
+    r"(?P<MAL_BEGIN>\\begin\{claimboundary(?!\})[^\s\}]*)"
+    r"|(?P<BEGIN>\\begin\{claimboundary\}(?:\[[^\]]*\])?)"
+    r"|(?P<MAL_END>\\end\{claimboundary(?!\})[^\s\}]*)"
+    r"|(?P<END>\\end\{claimboundary\})"
+)
+
 
 def strip_tex_comments(line: str) -> str:
     """Remove unescaped TeX comments from a single line while preserving whitespace."""
@@ -61,14 +68,12 @@ class PublicationScanner:
         file_path: str = "<memory>",
         profile: DocumentProfile = DocumentProfile.GENERIC,
         source_class: SourceClass | None = None,
-        strict: bool = False,
     ) -> ValidationResult:
         # Check trusted external exemption policy (inline magic markers do NOT grant exemption)
         if self.exemption_policy and self.exemption_policy.is_exempt(file_path):
             return ValidationResult(
                 target_file=file_path,
                 profile=profile,
-                passed=True,
                 findings=[],
                 metrics={"exempted": True, "lines_scanned": 0, "rules_evaluated": 0},
             )
@@ -84,13 +89,14 @@ class PublicationScanner:
         current_section_role = "frontmatter"
         current_inferred_source_class = source_class or SourceClass.UNKNOWN
 
-        # Block state tracking for claimboundary
+        # Block state tracking for claimboundary token state machine
         in_claim_boundary = False
         claim_start_line = 0
+        claim_source_class = current_inferred_source_class
         current_claim_prose: list[str] = []
 
-        # Line-by-line scanning with cross-line lookahead buffer
-        cleaned_lines: list[tuple[int, str]] = []
+        # Line-by-line scanning with cross-line lookahead buffer preserving line-local context
+        cleaned_lines: list[tuple[int, str, str, SourceClass]] = []
 
         for line_no, raw_line in enumerate(lines, start=1):
             # Comment stripping
@@ -98,8 +104,6 @@ class PublicationScanner:
             stripped = visible_line.strip()
             if not stripped:
                 continue
-
-            cleaned_lines.append((line_no, visible_line))
 
             # Section header and kicker extraction for contextual role & source class
             sec_match = re.search(r"\\(?:sub)?section(?:\[[^\]]*\])?\{([^}]+)\}", stripped)
@@ -117,139 +121,122 @@ class PublicationScanner:
             if inferred != SourceClass.UNKNOWN:
                 current_inferred_source_class = inferred
 
-            # Malformed tag checks (missing closing brace)
-            if re.search(r"\\begin\{claimboundary(?!\})", stripped):
-                findings.append(
-                    Finding(
-                        rule_id="RULE-BOUNDARY-SYNTAX-MALFORMED",
-                        category=FindingCategory.MALFORMED_STRUCTURE,
-                        severity=Severity.HARD_FAIL,
-                        message="Malformed \\begin{claimboundary} syntax (missing closing brace)",
-                        file_path=file_path,
-                        line_number=line_no,
-                        section_role=current_section_role,
-                        source_class=current_inferred_source_class.value,
-                    )
-                )
-                continue
-
-            if re.search(r"\\end\{claimboundary(?!\})", stripped):
-                findings.append(
-                    Finding(
-                        rule_id="RULE-BOUNDARY-SYNTAX-MALFORMED",
-                        category=FindingCategory.MALFORMED_STRUCTURE,
-                        severity=Severity.HARD_FAIL,
-                        message="Malformed \\end{claimboundary} syntax (missing closing brace)",
-                        file_path=file_path,
-                        line_number=line_no,
-                        section_role=current_section_role,
-                        source_class=current_inferred_source_class.value,
-                    )
-                )
-                continue
-
-            # Check for same-line begin and end: \begin{claimboundary}... \end{claimboundary}
-            same_line_match = re.search(
-                r"\\begin\{claimboundary\}(?:\[[^\]]*\])?(.*?)\\end\{claimboundary\}",
-                stripped,
+            # Record line with its location-local context for cross-line buffering
+            cleaned_lines.append(
+                (line_no, visible_line, current_section_role, current_inferred_source_class)
             )
-            if same_line_match:
-                if in_claim_boundary:
+
+            # Left-to-right claimboundary token sequence processing
+            cursor = 0
+            for match in CLAIMBOUNDARY_TOKEN_RE.finditer(stripped):
+                # Text segment preceding this token
+                text_segment = stripped[cursor:match.start()].strip()
+                if text_segment and in_claim_boundary:
+                    current_claim_prose.append(text_segment)
+
+                token_group = match.lastgroup
+                if token_group == "MAL_BEGIN":
                     findings.append(
                         Finding(
                             rule_id="RULE-BOUNDARY-SYNTAX-MALFORMED",
                             category=FindingCategory.MALFORMED_STRUCTURE,
                             severity=Severity.HARD_FAIL,
-                            message="Nested claimboundary environment is forbidden",
+                            message=f"Malformed \\begin{{claimboundary}} syntax at line {line_no} (missing closing brace)",
                             file_path=file_path,
                             line_number=line_no,
                             section_role=current_section_role,
                             source_class=current_inferred_source_class.value,
                         )
                     )
-                else:
-                    inner_prose = same_line_match.group(1).strip()
-                    boundary_findings = validate_boundary_prose(
-                        declared_class=current_inferred_source_class,
-                        prose=inner_prose,
-                        line_no=line_no,
-                        file_path=file_path,
-                    )
-                    for f in boundary_findings:
-                        f.section_role = current_section_role
-                        f.source_class = current_inferred_source_class.value
-                    findings.extend(boundary_findings)
-                continue
-
-            # Check for \begin{claimboundary} opening multiline block
-            if "\\begin{claimboundary}" in stripped:
-                if in_claim_boundary:
+                elif token_group == "MAL_END":
                     findings.append(
                         Finding(
                             rule_id="RULE-BOUNDARY-SYNTAX-MALFORMED",
                             category=FindingCategory.MALFORMED_STRUCTURE,
                             severity=Severity.HARD_FAIL,
-                            message=f"Nested claimboundary starting at line {line_no} inside active block from line {claim_start_line}",
+                            message=f"Malformed \\end{{claimboundary}} syntax at line {line_no} (missing closing brace)",
                             file_path=file_path,
                             line_number=line_no,
                             section_role=current_section_role,
                             source_class=current_inferred_source_class.value,
                         )
                     )
-                else:
-                    in_claim_boundary = True
-                    claim_start_line = line_no
-                    current_claim_prose = []
-                    # Capture any trailing text after \begin{claimboundary}[...]
-                    post_begin = re.sub(r"^.*?\\begin\{claimboundary\}(?:\[[^\]]*\])?", "", stripped).strip()
-                    if post_begin:
-                        current_claim_prose.append(post_begin)
-                continue
-
-            # Check for \end{claimboundary} closing multiline block
-            if "\\end{claimboundary}" in stripped:
-                if not in_claim_boundary:
-                    findings.append(
-                        Finding(
-                            rule_id="RULE-BOUNDARY-SYNTAX-MALFORMED",
-                            category=FindingCategory.MALFORMED_STRUCTURE,
-                            severity=Severity.HARD_FAIL,
-                            message=f"Unmatched \\end{{claimboundary}} at line {line_no} without preceding \\begin{{claimboundary}}",
-                            file_path=file_path,
-                            line_number=line_no,
-                            section_role=current_section_role,
-                            source_class=current_inferred_source_class.value,
+                elif token_group == "BEGIN":
+                    if in_claim_boundary:
+                        # Nested claimboundary environment is strictly forbidden (fail-closed)
+                        findings.append(
+                            Finding(
+                                rule_id="RULE-BOUNDARY-SYNTAX-MALFORMED",
+                                category=FindingCategory.MALFORMED_STRUCTURE,
+                                severity=Severity.HARD_FAIL,
+                                message=(
+                                    f"Nested claimboundary starting at line {line_no} "
+                                    f"inside active block from line {claim_start_line}"
+                                ),
+                                file_path=file_path,
+                                line_number=line_no,
+                                section_role=current_section_role,
+                                source_class=current_inferred_source_class.value,
+                            )
                         )
-                    )
-                else:
-                    pre_end = re.sub(r"\\end\{claimboundary\}.*$", "", stripped).strip()
-                    if pre_end:
-                        current_claim_prose.append(pre_end)
-                    full_boundary_text = " ".join(current_claim_prose)
-                    boundary_findings = validate_boundary_prose(
-                        declared_class=current_inferred_source_class,
-                        prose=full_boundary_text,
-                        line_no=claim_start_line,
-                        file_path=file_path,
-                    )
-                    for f in boundary_findings:
-                        f.section_role = current_section_role
-                        f.source_class = current_inferred_source_class.value
-                    findings.extend(boundary_findings)
-                    in_claim_boundary = False
-                    current_claim_prose = []
-                continue
+                    else:
+                        in_claim_boundary = True
+                        claim_start_line = line_no
+                        claim_source_class = current_inferred_source_class
+                        current_claim_prose = []
+                elif token_group == "END":
+                    if not in_claim_boundary:
+                        # Orphan / unmatched \end{claimboundary} (fail-closed)
+                        findings.append(
+                            Finding(
+                                rule_id="RULE-BOUNDARY-SYNTAX-MALFORMED",
+                                category=FindingCategory.MALFORMED_STRUCTURE,
+                                severity=Severity.HARD_FAIL,
+                                message=f"Unmatched \\end{{claimboundary}} at line {line_no} without preceding \\begin{{claimboundary}}",
+                                file_path=file_path,
+                                line_number=line_no,
+                                section_role=current_section_role,
+                                source_class=current_inferred_source_class.value,
+                            )
+                        )
+                    else:
+                        full_boundary_text = " ".join(current_claim_prose).strip()
+                        boundary_findings = validate_boundary_prose(
+                            declared_class=claim_source_class,
+                            prose=full_boundary_text,
+                            line_no=claim_start_line,
+                            file_path=file_path,
+                        )
+                        for f in boundary_findings:
+                            f.section_role = current_section_role
+                            f.source_class = (
+                                claim_source_class.value
+                                if claim_source_class != SourceClass.UNKNOWN
+                                else "GENERIC"
+                            )
+                        findings.extend(boundary_findings)
+                        in_claim_boundary = False
+                        current_claim_prose = []
 
-            if in_claim_boundary:
-                current_claim_prose.append(stripped)
+                cursor = match.end()
 
-            # Evaluate each active rule on the current visible line
+            # Trailing segment on this line
+            trailing_segment = stripped[cursor:].strip()
+            if trailing_segment and in_claim_boundary:
+                current_claim_prose.append(trailing_segment)
+
+            # Invariant: Being inside claimboundary != exemption from generic Publication Boundary rules.
+            # Every visible line runs through all active generic rules unconditionally.
             for rule in self.rules:
                 if profile in rule.profiles:
                     line_findings = rule.check_fn(visible_line, line_no, file_path, profile)
                     for f in line_findings:
                         f.section_role = current_section_role
-                        f.source_class = current_inferred_source_class.value
+                        f.source_class = (
+                            current_inferred_source_class.value
+                            if current_inferred_source_class != SourceClass.UNKNOWN
+                            else "GENERIC"
+                        )
                     findings.extend(line_findings)
 
         # Fail-closed check: unclosed claimboundary block at EOF
@@ -263,14 +250,19 @@ class PublicationScanner:
                     file_path=file_path,
                     line_number=claim_start_line,
                     section_role=current_section_role,
-                    source_class=current_inferred_source_class.value,
+                    source_class=(
+                        claim_source_class.value
+                        if claim_source_class != SourceClass.UNKNOWN
+                        else "GENERIC"
+                    ),
                 )
             )
 
         # Cross-line token splitting buffering: check consecutive non-empty lines
+        # Preserves location-local semantic context from the originating line
         for idx in range(len(cleaned_lines) - 1):
-            prev_line_no, prev_text = cleaned_lines[idx]
-            curr_line_no, curr_text = cleaned_lines[idx + 1]
+            prev_line_no, prev_text, prev_role, prev_sclass = cleaned_lines[idx]
+            curr_line_no, curr_text, curr_role, curr_sclass = cleaned_lines[idx + 1]
 
             candidate_variants = [
                 (f"{prev_text.strip()} {curr_text.strip()}", len(prev_text.strip())),
@@ -289,8 +281,13 @@ class PublicationScanner:
                                     m_end = m_start + len(f.matched_text)
                                     if m_start < boundary_offset and m_end > boundary_offset:
                                         f.line_number = prev_line_no
-                                        f.section_role = current_section_role
-                                        f.source_class = current_inferred_source_class.value
+                                        # Location-local context strictly preserved
+                                        f.section_role = prev_role
+                                        f.source_class = (
+                                            prev_sclass.value
+                                            if prev_sclass != SourceClass.UNKNOWN
+                                            else "GENERIC"
+                                        )
                                         f.message = f"[Cross-Line] {f.message}"
                                         findings.append(f)
                                         seen_cross_rules.add(rule.rule_id)
@@ -317,7 +314,6 @@ class PublicationScanner:
             findings=findings,
             metrics={
                 "lines_scanned": len(lines),
-                "strict_mode": strict,
                 "rules_evaluated": len(self.rules),
             },
         )
@@ -327,7 +323,6 @@ class PublicationScanner:
         file_path: Path | str,
         profile: DocumentProfile = DocumentProfile.GENERIC,
         source_class: SourceClass | None = None,
-        strict: bool = False,
     ) -> ValidationResult:
         path = Path(file_path)
         if not path.is_file():
@@ -354,5 +349,4 @@ class PublicationScanner:
             file_path=str(path),
             profile=profile,
             source_class=source_class,
-            strict=strict,
         )

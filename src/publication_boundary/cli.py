@@ -49,11 +49,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Explicit source class context for Claim Boundary checking.",
     )
-    parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="Fail on REVIEW_REQUIRED findings in addition to HARD_FAIL.",
-    )
     return parser
 
 
@@ -84,7 +79,6 @@ def main(argv: list[str] | None = None) -> int:
                     path,
                     profile=profile,
                     source_class=source_class,
-                    strict=args.strict,
                 )
             )
         elif path.is_dir():
@@ -95,7 +89,6 @@ def main(argv: list[str] | None = None) -> int:
                             child,
                             profile=profile,
                             source_class=source_class,
-                            strict=args.strict,
                         )
                     )
 
