@@ -138,7 +138,7 @@ for finding in result.findings:
 
 ## 4. Test Suite & Verification
 
-The test suite includes 76 automated tests covering unit rules, integration scanning, property-based invariants with `hypothesis`, and all 40 machine-readable fixtures.
+The test suite includes 84 automated tests covering unit rules, integration scanning, property-based invariants with `hypothesis`, and all 40 machine-readable fixtures.
 
 ```bash
 # Run pytest with test coverage
@@ -146,11 +146,11 @@ pytest --cov=publication_boundary --cov-report=term-missing
 ```
 
 ### Test Results Summary
-- **Tests Executed**: 76
-- **Tests Passed**: 76 (100%)
+- **Tests Executed**: 84
+- **Tests Passed**: 84
 - **Test Failures**: 0
-- **Code Coverage**: 98% across `src/publication_boundary`
-- **Execution Time**: ~0.9s
+- **Code Coverage**: 96% across `src/publication_boundary`
+- **Execution Time**: ~0.8s
 
 ---
 
@@ -161,4 +161,4 @@ pytest --cov=publication_boundary --cov-report=term-missing
 2. **The Japanese-English Code-Switching Boundary Defect**:
    Python's regex engine treats both ASCII alphanumeric characters and Japanese characters (Kanji, Hiragana, Katakana) as Unicode `\w`. Standard word boundaries `\b` fail when ASCII tokens directly border Japanese particles (e.g. `HOLD_OUTとして`, `D017および`). This was solved using ASCII lookaround delimiters `(?<![a-zA-Z0-9_])` and `(?![a-zA-Z0-9_])`.
 3. **Context-Aware Preservation of Legitimate Technical Vocabulary**:
-   By analyzing syntactic collocations, the validator permits legitimate engineering terms (`software architecture`, `empirical evidence`, `candidate model`, `packet drop`) with 0% false positives, while detecting internal pipeline state leaks with 100% precision.
+   Across the 40-fixture regression suite and ambiguous technical evaluation corpus, the validator successfully distinguished legitimate engineering terms (`software architecture`, `empirical evidence`, `candidate model`, `packet drop`) without false positives, while detecting all target internal pipeline state leaks.

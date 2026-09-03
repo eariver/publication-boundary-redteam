@@ -137,7 +137,7 @@ def validate_boundary_prose(
 
 # Heuristic section-title mapping to source class
 SECTION_HEADER_SOURCE_MAP: list[tuple[re.Pattern[str], SourceClass]] = [
-    (re.compile(r"Research\s+Paper\s+Watch|研究論文ウォッチ|研究論文", re.IGNORECASE), SourceClass.RESEARCH_PAPER),
+    (re.compile(r"Research\s+(?:Paper\s+)?Watch|Paper\s+Watch|研究論文ウォッチ|研究論文", re.IGNORECASE), SourceClass.RESEARCH_PAPER),
     (re.compile(r"OSS\s+Watch|オープンソースウォッチ|OSS動向", re.IGNORECASE), SourceClass.OSS_RELEASE),
     (re.compile(r"Community\s+Pulse|コミュニティパルス|X\s+Trend\s+Watch", re.IGNORECASE), SourceClass.COMMUNITY_OBSERVATION),
     (re.compile(r"Feature|新モデル発表|公式リリース", re.IGNORECASE), SourceClass.VENDOR_ANNOUNCEMENT),

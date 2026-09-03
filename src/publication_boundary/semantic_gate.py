@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
-import uuid
 from typing import Callable, Sequence
 
 from publication_boundary.models import (
     Finding,
     FindingCategory,
+    GateStatus,
     SemanticPacket,
     SemanticReviewResponse,
     Severity,
@@ -21,34 +22,47 @@ class DeterministicGate:
 
     Operates with zero external network or model dependencies.
     Executes lexical, path, boundary, and bibliographic invariant checks.
+    Fail-closed: REVIEW_REQUIRED findings halt final gate approval and require semantic resolution.
     """
 
-    def __init__(self, fail_on_review_required: bool = False):
+    def __init__(self, fail_on_review_required: bool = True):
         self.fail_on_review_required = fail_on_review_required
 
-    def evaluate(self, result: ValidationResult) -> tuple[bool, list[SemanticPacket]]:
+    def evaluate(self, result: ValidationResult) -> tuple[GateStatus, list[SemanticPacket]]:
         """Evaluate deterministic result.
 
         Returns:
-            (gate_passed, packets_for_semantic_review)
+            (gate_status, packets_for_semantic_review)
         """
         hard_fails = [f for f in result.findings if f.severity == Severity.HARD_FAIL]
         reviews_needed = [f for f in result.findings if f.severity == Severity.REVIEW_REQUIRED]
 
         if hard_fails:
-            # Deterministic hard fail halts the gate
-            return False, []
+            # Deterministic hard fail halts the gate immediately
+            return GateStatus.FAIL, []
 
         if reviews_needed:
-            # Build semantic review packets for items requiring deeper analysis
+            # Build deterministic semantic review packets for items requiring deeper analysis
             packets: list[SemanticPacket] = []
             for idx, finding in enumerate(reviews_needed, start=1):
+                text_to_review = finding.context_snippet or finding.matched_text
+                role = finding.section_role or "prose_block"
+                s_class = finding.source_class or "UNKNOWN"
+
+                # Deterministic packet ID generation based on canonical input hash
+                canonical_str = (
+                    f"{result.profile.value}:{role}:{s_class}:"
+                    f"{finding.rule_id}:{finding.line_number}:{text_to_review}"
+                )
+                digest = hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()[:8].upper()
+                packet_id = f"PKT-{digest}-{idx}"
+
                 packet = SemanticPacket(
-                    packet_id=f"PKT-{uuid.uuid4().hex[:8]}-{idx}",
+                    packet_id=packet_id,
                     document_profile=result.profile.value,
-                    section_role="prose_block",
-                    source_class="unknown",
-                    text=finding.context_snippet or finding.matched_text,
+                    section_role=role,
+                    source_class=s_class,
+                    text=text_to_review,
                     deterministic_findings=[finding.to_dict()],
                     context={
                         "target_file": result.target_file,
@@ -58,11 +72,10 @@ class DeterministicGate:
                 )
                 packets.append(packet)
 
-            if self.fail_on_review_required:
-                return False, packets
-            return True, packets
+            # Gate halts in NEEDS_REVIEW state until Tier 2 semantic resolution
+            return GateStatus.NEEDS_REVIEW, packets
 
-        return True, []
+        return GateStatus.PASS, []
 
 
 # Protocol for pluggable semantic reviewers

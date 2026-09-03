@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 
@@ -20,6 +21,22 @@ class Severity(str, Enum):
         return {"HARD_FAIL": 3, "REVIEW_REQUIRED": 2, "INFO": 1}[self.value]
 
 
+class GateStatus(str, Enum):
+    """Final status of a publication gate evaluation."""
+
+    PASS = "PASS"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+    FAIL = "FAIL"
+
+    @property
+    def is_passed(self) -> bool:
+        """Return True only when the gate is fully cleared without blocking findings or pending review."""
+        return self == GateStatus.PASS
+
+    def __bool__(self) -> bool:
+        return self == GateStatus.PASS
+
+
 class FindingCategory(str, Enum):
     """Classification of publication boundary violations."""
 
@@ -30,6 +47,7 @@ class FindingCategory(str, Enum):
     SOURCE_CLASS_BOUNDARY_MISMATCH = "SOURCE_CLASS_BOUNDARY_MISMATCH"
     BIBLIOGRAPHY_BOUNDARY = "BIBLIOGRAPHY_BOUNDARY"
     INTERNAL_IDENTIFIER = "INTERNAL_IDENTIFIER"
+    MALFORMED_STRUCTURE = "MALFORMED_STRUCTURE"
 
 
 class DocumentProfile(str, Enum):
@@ -60,6 +78,24 @@ class SourceClass(str, Enum):
 
 
 @dataclass
+class ExemptionPolicy:
+    """Trusted external policy for exempting specific files or path patterns."""
+
+    exempt_paths: set[str] = field(default_factory=set)
+    exempt_globs: list[str] = field(default_factory=list)
+
+    def is_exempt(self, file_path: str | Path) -> bool:
+        from fnmatch import fnmatch
+        path_str = str(file_path).replace("\\", "/")
+        if path_str in self.exempt_paths:
+            return True
+        for glob_pat in self.exempt_globs:
+            if fnmatch(path_str, glob_pat) or fnmatch(Path(path_str).name, glob_pat):
+                return True
+        return False
+
+
+@dataclass
 class Finding:
     """Individual publication boundary finding."""
 
@@ -73,6 +109,8 @@ class Finding:
     matched_text: str = ""
     context_snippet: str = ""
     suggestion: str = ""
+    section_role: str = ""
+    source_class: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -86,6 +124,8 @@ class Finding:
             "matched_text": self.matched_text,
             "context_snippet": self.context_snippet,
             "suggestion": self.suggestion,
+            "section_role": self.section_role,
+            "source_class": self.source_class,
         }
 
     @classmethod
@@ -101,6 +141,8 @@ class Finding:
             matched_text=data.get("matched_text", ""),
             context_snippet=data.get("context_snippet", ""),
             suggestion=data.get("suggestion", ""),
+            section_role=data.get("section_role", ""),
+            source_class=data.get("source_class", ""),
         )
 
 
@@ -110,9 +152,21 @@ class ValidationResult:
 
     target_file: str
     profile: DocumentProfile
-    passed: bool
+    passed: bool = False
     findings: list[Finding] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
+    status: GateStatus = GateStatus.PASS
+
+    def __post_init__(self) -> None:
+        if self.hard_fail_count > 0:
+            self.status = GateStatus.FAIL
+            self.passed = False
+        elif self.review_required_count > 0:
+            self.status = GateStatus.NEEDS_REVIEW
+            self.passed = False  # Fail-closed: REVIEW_REQUIRED must not be a final PASS before semantic resolution
+        else:
+            self.status = GateStatus.PASS
+            self.passed = True
 
     @property
     def hard_fail_count(self) -> int:
@@ -136,6 +190,7 @@ class ValidationResult:
             "schema_version": "1.0",
             "target_file": self.target_file,
             "profile": self.profile.value,
+            "status": self.status.value,
             "passed": self.passed,
             "summary": {
                 "total_findings": len(self.findings),

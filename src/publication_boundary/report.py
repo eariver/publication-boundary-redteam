@@ -8,20 +8,21 @@ from typing import Sequence
 from publication_boundary.models import Severity, ValidationResult
 
 
-def format_text_report(results: Sequence[ValidationResult]) -> str:
+def format_text_report(results: Sequence[ValidationResult] | ValidationResult) -> str:
     """Render a human-readable text report suitable for CLI terminal display."""
+    res_list: Sequence[ValidationResult] = [results] if isinstance(results, ValidationResult) else results
     lines: list[str] = []
     lines.append("=" * 78)
     lines.append("PUBLICATION BOUNDARY SCAN REPORT")
     lines.append("=" * 78)
 
-    total_files = len(results)
-    passed_files = sum(1 for r in results if r.passed)
-    total_hard_fails = sum(r.hard_fail_count for r in results)
-    total_reviews = sum(r.review_required_count for r in results)
-    total_info = sum(r.info_count for r in results)
+    total_files = len(res_list)
+    passed_files = sum(1 for r in res_list if r.passed)
+    total_hard_fails = sum(r.hard_fail_count for r in res_list)
+    total_reviews = sum(r.review_required_count for r in res_list)
+    total_info = sum(r.info_count for r in res_list)
 
-    for res in results:
+    for res in res_list:
         status_str = "PASS" if res.passed else "FAIL"
         lines.append(f"\nTarget:  {res.target_file}")
         lines.append(f"Profile: {res.profile.value} | Status: [{status_str}]")
@@ -65,31 +66,35 @@ def format_text_report(results: Sequence[ValidationResult]) -> str:
     return "\n".join(lines)
 
 
-def format_json_report(results: Sequence[ValidationResult], indent: int = 2) -> str:
+def format_json_report(results: Sequence[ValidationResult] | ValidationResult, indent: int = 2) -> str:
     """Render a structured JSON report conforming to the shared schema."""
+    res_list: Sequence[ValidationResult] = [results] if isinstance(results, ValidationResult) else results
+    all_passed = all(r.passed for r in res_list)
     payload = {
         "schema_version": "1.0",
-        "passed": all(r.passed for r in results),
-        "total_targets": len(results),
-        "targets_passed": sum(1 for r in results if r.passed),
-        "total_findings": sum(len(r.findings) for r in results),
+        "status": "PASS" if all_passed else "FAIL",
+        "passed": all_passed,
+        "total_targets": len(res_list),
+        "targets_passed": sum(1 for r in res_list if r.passed),
+        "total_findings": sum(len(r.findings) for r in res_list),
         "summary": {
-            "hard_fails": sum(r.hard_fail_count for r in results),
-            "review_required": sum(r.review_required_count for r in results),
-            "info": sum(r.info_count for r in results),
+            "hard_fails": sum(r.hard_fail_count for r in res_list),
+            "review_required": sum(r.review_required_count for r in res_list),
+            "info": sum(r.info_count for r in res_list),
         },
-        "results": [r.to_dict() for r in results],
+        "results": [r.to_dict() for r in res_list],
     }
     return json.dumps(payload, ensure_ascii=False, indent=indent)
 
 
-def format_markdown_summary(results: Sequence[ValidationResult]) -> str:
+def format_markdown_summary(results: Sequence[ValidationResult] | ValidationResult) -> str:
     """Render a markdown summary table for PR comments or audit logs."""
+    res_list: Sequence[ValidationResult] = [results] if isinstance(results, ValidationResult) else results
     lines: list[str] = [
         "| Target File | Profile | Status | Hard Fails | Review Required | Info |",
         "|---|---|---|---|---|---|",
     ]
-    for r in results:
+    for r in res_list:
         status = "✅ PASS" if r.passed else "❌ FAIL"
         lines.append(
             f"| `{r.target_file}` | `{r.profile.value}` | {status} | "

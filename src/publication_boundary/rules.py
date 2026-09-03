@@ -235,7 +235,7 @@ def check_raw_provenance_paths(
 # ---------------------------------------------------------------------------
 
 REBUTTAL_HARD_FAIL = re.compile(
-    r"(?:三つ|3つ)のFeature(?:だけで(?:は)?(?:説明できる|終わる|閉じる|ない)|だけではない)|"
+    r"(?:三つ|3つ)の\s*Feature\s*(?:だけで(?:は)?(?:説明できる|終わる|閉じる|ない)|だけではない)|"
     r"承認済み\s*Architecture(?:は|が|に)|"
     r"\bapproved\s+Architecture\s+(?:says|requires|defines|specifies)\b|"
     r"\bArchitecture\s+requires\s+(?:concrete|that|all)\b",

@@ -122,4 +122,4 @@ All 8 ambiguous fixtures in `fixtures/ambiguous/` were tested against the valida
 7. `amb_07_top_candidate_evaluation.tex` -> **PASS (0 findings)**
 8. `amb_08_medical_screening_test.tex` -> **PASS (0 findings)**
 
-This confirms that the context-aware rules achieve zero false positives on standard technical and scientific terminology.
+This confirms that the context-aware rules achieve zero false positives across the tested ambiguous technical corpus and fixture suite.

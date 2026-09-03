@@ -19,9 +19,9 @@ To evaluate the resilience of the validator prototype beyond the standard test s
 | 3. Renamed internal enums     | Blind         | Schema drift beyond ontology  |
 | 4. Indirect review rebuttal   | Escapes Lint  | Subtle argumentative posture  |
 | 5. Macro-obfuscated TeX       | Bypassable    | TeX token macro concatenation |
-| 6. Code-switching edge cases  | Protected     | Handled via ASCII lookarounds |
-| 7. Innocent technical usage   | Protected     | Zero false positives observed |
-| 8. Cross-line boundary splits | Protected     | Multiline block buffering     |
+| 6. Code-switching edge cases  | Protected          | Handled via ASCII lookarounds |
+| 7. Innocent technical usage   | Protected (Corpus) | Zero false positives observed across 40-fixture suite |
+| 8. Cross-line boundary splits | Protected (Buffer) | Consecutive line buffering catches split phrases; hyphenation edge case |
 +-------------------------------------------------------------------------------+
 ```
 
@@ -94,6 +94,24 @@ To evaluate the resilience of the validator prototype beyond the standard test s
 
 ---
 
+### 2.6 Cross-Line Token Buffering vs Intra-Token Hyphenation
+**Cross-Line Phrase Splitting (Protected)**:
+```latex
+今週の動向は三つのFeature
+だけではない。
+```
+- **Current Behavior**: Protected. `PublicationScanner` implements consecutive-line lookahead buffering testing both spaced and unspaced joins, detecting phrases spanning across newlines.
+
+**Intra-Token Hyphenation Edge Case (Known Limitation)**:
+```latex
+The candidates were assigned to HOLD-
+OUT for subsequent validation.
+```
+- **Observed Behavior**: If an internal identifier itself is severed with an intra-token hyphen across a line break (`HOLD-\nOUT`), lexical token matchers fail unless preceded by a de-hyphenation pass.
+- **Mitigation**: Add a de-hyphenation pre-pass (`re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', text)`) prior to lexical matching.
+
+---
+
 ## 3. Residual Edge Cases & Planned Mitigations
 
 | Vulnerability ID | Vulnerability Description | Current Status | Recommended Remediation |
@@ -103,3 +121,4 @@ To evaluate the resilience of the validator prototype beyond the standard test s
 | **VULN-003** | Upstream enum renaming (schema drift) | Manual rule updates | Bind rule patterns directly to `schemas/` enum definitions |
 | **VULN-004** | Split TeX macros across token boundaries | Unmitigated without AST | Scan extracted text from compiled PDF in addition to `.tex` |
 | **VULN-005** | Markdown table cell formatting | Partially mitigated | Ensure multiline Markdown table parsers normalize whitespace |
+| **VULN-006** | Intra-token hyphenation across line breaks (`HOLD-\nOUT`) | Edge case | Add de-hyphenation normalization pass for hyphenated line breaks |

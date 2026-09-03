@@ -1,13 +1,24 @@
-"""Tests for the PublicationScanner engine and report generation."""
+"""Tests for the PublicationScanner engine, claimboundary block parsing, and report generation."""
 
 import json
-from publication_boundary.models import DocumentProfile, FindingCategory, Severity
+from publication_boundary.models import (
+    DocumentProfile,
+    ExemptionPolicy,
+    FindingCategory,
+    GateStatus,
+    Severity,
+    SourceClass,
+)
 from publication_boundary.report import (
     format_json_report,
     format_markdown_summary,
     format_text_report,
 )
-from publication_boundary.scanner import PublicationScanner, strip_tex_comments
+from publication_boundary.scanner import (
+    PublicationScanner,
+    mask_md_comments,
+    strip_tex_comments,
+)
 
 
 def test_strip_tex_comments():
@@ -16,13 +27,31 @@ def test_strip_tex_comments():
     assert strip_tex_comments("% full comment") == ""
 
 
-def test_scanner_exempt_marker():
+def test_scanner_no_self_bypass_via_inline_magic_marker():
+    """Inline magic markers in content must NOT grant self-exemption."""
     scanner = PublicationScanner()
     text = "% reader-facing-prose-lint: allow-internal-metadata\nCore v2 contract and Evidence Card."
+    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res.passed is False
+    assert res.status == GateStatus.FAIL
+    assert res.hard_fail_count >= 1
+    assert any(f.rule_id == "RULE-TERM-CORE-V2" for f in res.findings)
+
+
+def test_scanner_trusted_external_exemption_policy():
+    """Trusted external ExemptionPolicy successfully exempts designated files."""
+    policy = ExemptionPolicy(exempt_paths={"test.tex"}, exempt_globs=["provenance/*"])
+    scanner = PublicationScanner(exemption_policy=policy)
+
+    text = "Core v2 contract and Evidence Card."
     res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
     assert res.passed is True
     assert len(res.findings) == 0
     assert res.metrics.get("exempted") is True
+
+    res_glob = scanner.scan_text(text, "provenance/notes.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res_glob.passed is True
+    assert len(res_glob.findings) == 0
 
 
 def test_scanner_commented_leak_ignored():
@@ -44,35 +73,115 @@ def test_scanner_deterministic_output():
     assert res1.to_dict() == res2.to_dict()
 
 
-def test_scanner_strict_mode():
+def test_scanner_review_required_fail_closed():
+    """REVIEW_REQUIRED findings result in NEEDS_REVIEW status and fail-closed gate."""
     scanner = PublicationScanner()
-    # A review required line
     sample = "前回のレビュー指摘事項を踏まえて範囲を決定した。"
-    normal_res = scanner.scan_text(sample, "test.tex", strict=False)
-    strict_res = scanner.scan_text(sample, "test.tex", strict=True)
+    res = scanner.scan_text(sample, "test.tex", strict=False)
 
-    assert normal_res.passed is True  # Only REVIEW_REQUIRED, no HARD_FAIL
-    assert strict_res.passed is False  # Strict fails on REVIEW_REQUIRED
+    assert res.status == GateStatus.NEEDS_REVIEW
+    assert res.passed is False  # Fail-closed before semantic resolution
+    assert res.review_required_count == 1
+    assert res.hard_fail_count == 0
+
+
+def test_claimboundary_same_line_detection():
+    """Same-line \\begin{claimboundary}...\\end{claimboundary} must be evaluated."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Research Watch}" + "\n"
+        r"\begin{claimboundary} Statements are first-party vendor claims without verification. \end{claimboundary}"
+    )
+    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res.passed is False
+    assert any(f.rule_id == "RULE-BOUNDARY-SOURCE-CLASS-MISMATCH" for f in res.findings)
+
+
+def test_claimboundary_nested_fails_closed():
+    """Nested claimboundary environments must fail closed with malformed structure finding."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Section}" + "\n"
+        r"\begin{claimboundary}" + "\n"
+        r"Outer prose." + "\n"
+        r"\begin{claimboundary}" + "\n"
+        r"Inner prose." + "\n"
+        r"\end{claimboundary}" + "\n"
+        r"\end{claimboundary}"
+    )
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert any(f.rule_id == "RULE-BOUNDARY-SYNTAX-MALFORMED" for f in res.findings)
+
+
+def test_claimboundary_unclosed_at_eof_fails_closed():
+    """Unclosed claimboundary at EOF must fail closed."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Section}" + "\n"
+        r"\begin{claimboundary}" + "\n"
+        r"Prose that is never closed."
+    )
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert any(f.rule_id == "RULE-BOUNDARY-SYNTAX-MALFORMED" for f in res.findings)
+
+
+def test_claimboundary_unmatched_end_fails_closed():
+    """Orphan \\end{claimboundary} without \\begin must fail closed."""
+    scanner = PublicationScanner()
+    text = r"Normal text." + "\n" + r"\end{claimboundary}"
+    res = scanner.scan_text(text, "test.tex")
+    assert res.passed is False
+    assert any(f.rule_id == "RULE-BOUNDARY-SYNTAX-MALFORMED" for f in res.findings)
+
+
+def test_markdown_comment_masking_and_line_preservation():
+    """Markdown comments must be masked without shifting subsequent line numbers."""
+    scanner = PublicationScanner()
+    md_text = (
+        "# Title\n"
+        "<!--\n"
+        "HOLD_OUT in comment\n"
+        "Core v2 contract in comment\n"
+        "-->\n"
+        "D017 on line 6."
+    )
+    res = scanner.scan_text(md_text, "report.md")
+    assert res.passed is False
+    # Only D017 on line 6 should be found; comments on lines 3-4 must be masked
+    assert len(res.findings) == 1
+    assert res.findings[0].rule_id == "RULE-TERM-INTERNAL-ID"
+    assert res.findings[0].line_number == 6
+
+
+def test_cross_line_token_splitting_buffering():
+    """Phrases split across line breaks must be detected via consecutive line buffering."""
+    scanner = PublicationScanner()
+    text = (
+        r"\section{Synthesis}" + "\n"
+        r"今週の動向は三つのFeature" + "\n"
+        r"だけではない。"
+    )
+    res = scanner.scan_text(text, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
+    assert res.passed is False
+    assert any("三つのFeature だけではない" in f.matched_text for f in res.findings)
 
 
 def test_report_formats():
     scanner = PublicationScanner()
     sample = "HOLD_OUT candidate in text.\n"
-    res = scanner.scan_text(sample, "file.tex", DocumentProfile.GENERIC)
+    res = scanner.scan_text(sample, "test.tex", DocumentProfile.WEEKLY_MAGAZINE)
 
-    # Text report
-    text_out = format_text_report([res])
-    assert "PUBLICATION BOUNDARY SCAN REPORT" in text_out
-    assert "HOLD_OUT" in text_out
+    txt = format_text_report(res)
+    assert "PUBLICATION BOUNDARY SCAN REPORT" in txt
+    assert "FAIL" in txt
 
-    # JSON report
-    json_out = format_json_report([res])
-    data = json.loads(json_out)
-    assert data["schema_version"] == "1.0"
-    assert data["passed"] is False
-    assert data["summary"]["hard_fails"] >= 1
+    js = format_json_report(res)
+    d = json.loads(js)
+    assert d["passed"] is False
+    assert d["status"] == "FAIL"
 
-    # Markdown table
-    md_out = format_markdown_summary([res])
-    assert "| `file.tex` |" in md_out
-    assert "❌ FAIL" in md_out
+    md = format_markdown_summary([res])
+    assert "| Target File | Profile | Status | Hard Fails | Review Required | Info |" in md
+    assert "❌ FAIL" in md
